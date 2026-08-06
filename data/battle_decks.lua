@@ -4,7 +4,7 @@ return
 
     {
 
-        id = "BINF",
+        id = "LINF",
         cards = {
 
             { id = "DMG1", qty = 4 },

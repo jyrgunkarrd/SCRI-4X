@@ -6,6 +6,7 @@ return
 
         id = "BLAKBER",  
         name = "Black Beret",
+        bat_deck = "EINF",
 
     },
 
@@ -14,6 +15,7 @@ return
         id = "IFVJUNK",
         name = "BMP-2",
         bat_scale = 4,
+        bat_deck = "JAFV",
 
     },
 
@@ -22,6 +24,7 @@ return
         id = "6WIFV",
         name = "Wheeled ICV",
         bat_scale = 4,
+        bat_deck = "LAFV",
 
     },
 
@@ -29,6 +32,7 @@ return
 
         id = "FORG",
         name = "Forgiven",
+        bat_deck = "LINF",
 
     },
 
