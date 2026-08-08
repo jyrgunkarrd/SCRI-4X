@@ -2,6 +2,7 @@ local editor = {}
 
 local Camera = require("src.sys.camera_sys")
 local MapDraw = require("src.sys.mapdraw")
+local Spawners = require("tools.map_editor.spawners")
 
 local VIRTUAL_WIDTH, VIRTUAL_HEIGHT = 1920, 1080
 local PALETTE_DIR = "assets/map_palette"
@@ -9,7 +10,7 @@ local MAP_FILE = "data/map.lua"
 local DEFAULT_FONT = "assets/fonts/Furore.otf"
 local HEX_RADIUS = 42
 
-local canvas, camera, map
+local canvas, camera, map, spawners
 local viewScale, viewX, viewY = 1, 0, 0
 local state = {
     palettes = {}, paletteIndex = 1, colorIndex = 1,
@@ -170,6 +171,22 @@ local function exportMap()
             key, color[1], color[2], color[3], color[4] or 1)
     end
     lines[#lines + 1] = "    },"
+    lines[#lines + 1] = "    spawners = {"
+    local spawnerKeys = {}
+    for key in pairs(spawners.entries) do spawnerKeys[#spawnerKeys + 1] = key end
+    table.sort(spawnerKeys)
+    for _, key in ipairs(spawnerKeys) do
+        lines[#lines + 1] = ("        [%q] = %q,"):format(key, spawners.entries[key])
+    end
+    lines[#lines + 1] = "    },"
+    lines[#lines + 1] = "    sites = {"
+    local siteKeys = {}
+    for key in pairs(spawners.sites) do siteKeys[#siteKeys + 1] = key end
+    table.sort(siteKeys)
+    for _, key in ipairs(siteKeys) do
+        lines[#lines + 1] = ("        [%q] = %q,"):format(key, spawners.sites[key])
+    end
+    lines[#lines + 1] = "    },"
     lines[#lines + 1] = "}"
     lines[#lines + 1] = ""
 
@@ -220,6 +237,9 @@ function editor.load()
     camera:setViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
     local focusPadding = math.max(VIRTUAL_WIDTH, VIRTUAL_HEIGHT) / (2 * camera.minZoom)
     camera:setBounds(left, top, right, bottom, focusPadding)
+    spawners = Spawners.new(map, camera, mapData.spawners or {}, mapData.sites or {}, function(message)
+        state.message = message
+    end)
     updateViewport()
     scanPalettes()
 end
@@ -227,8 +247,9 @@ end
 function editor.resize() updateViewport() end
 
 function editor.update(dt)
-    if state.confirming then return end
+    if state.confirming or spawners:isEditing() then return end
     local mouseX, mouseY = toVirtual(love.mouse.getPosition())
+    if mouseY > 92 then spawners:updateHover(mouseX, mouseY) else spawners:clearHover() end
     camera:update(dt, mouseX, mouseY)
 end
 
@@ -237,6 +258,7 @@ function editor.draw()
     love.graphics.clear(0.025, 0.045, 0.06, 1)
     camera:attach()
     map:draw(camera)
+    spawners:draw()
     camera:detach()
 
     love.graphics.setColor(0, 0, 0, 0.78)
@@ -244,7 +266,7 @@ function editor.draw()
     love.graphics.setColor(0.92, 0.95, 0.96, 1)
     local palette = currentPalette()
     local paletteName = palette and palette.name or "none"
-    love.graphics.print(("Palette [ ]: %s (%d/%d)    Color , .: %d/%d    Left paint | Right erase | Middle pan | Wheel zoom | E save"):format(
+    love.graphics.print(("Palette [ ]: %s (%d/%d)    Color , .: %d/%d    Left paint | Right erase | A agent | S site | E save"):format(
         paletteName, state.paletteIndex, #state.palettes, state.colorIndex,
         palette and #palette.colors or 0), 20, 14)
     if palette then
@@ -263,7 +285,9 @@ function editor.draw()
     love.graphics.setColor(0.9, 0.94, 0.95, 1)
     love.graphics.printf(state.message, 500, 50, VIRTUAL_WIDTH - 520, "right")
 
-    if state.confirming then
+    if spawners:isEditing() then
+        spawners:drawPrompt(VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
+    elseif state.confirming then
         love.graphics.setColor(0, 0, 0, 0.72)
         love.graphics.rectangle("fill", 0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
         love.graphics.setColor(0.06, 0.08, 0.1, 1)
@@ -288,6 +312,10 @@ function editor.draw()
 end
 
 function editor.keypressed(key)
+    if spawners:isEditing() then
+        spawners:keypressed(key)
+        return
+    end
     if state.confirming then
         if key == "return" or key == "kpenter" or key == "y" then
             state.confirming = false
@@ -298,6 +326,7 @@ function editor.keypressed(key)
         end
         return
     end
+    if spawners:keypressed(key) then return end
     if key == "escape" then love.event.quit()
     elseif key == "e" then state.confirming = true
     elseif key == "[" then cyclePalette(-1)
@@ -307,7 +336,12 @@ function editor.keypressed(key)
     end
 end
 
+function editor.textinput(text)
+    spawners:textinput(text)
+end
+
 function editor.mousepressed(x, y, button)
+    if spawners:isEditing() then return end
     local virtualX, virtualY = toVirtual(x, y)
     if state.confirming then
         if button == 1 then
@@ -339,8 +373,9 @@ function editor.mousereleased(x, y, button)
 end
 
 function editor.mousemoved(x, y, dx, dy)
-    if state.confirming then return end
+    if state.confirming or spawners:isEditing() then return end
     local virtualX, virtualY = toVirtual(x, y)
+    if virtualY > 92 then spawners:updateHover(virtualX, virtualY) else spawners:clearHover() end
     if state.painting then paintAt(virtualX, virtualY) end
     camera:mousemoved(virtualX, virtualY, dx / viewScale, dy / viewScale)
 end

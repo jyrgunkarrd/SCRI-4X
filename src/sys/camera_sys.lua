@@ -18,6 +18,7 @@ function Camera.new(x, y, zoom)
         viewportHeight = 1080,
         bounds = nil,
         boundsPadding = 100,
+        presentationOffsetY = 0,
     }, Camera)
 end
 
@@ -88,7 +89,8 @@ function Camera:attach()
     love.graphics.push()
     love.graphics.translate(self.viewportWidth / 2, self.viewportHeight / 2)
     love.graphics.scale(self.zoom)
-    love.graphics.translate(-self.x, -self.y)
+    love.graphics.translate(-self.x,
+        -(self.y + self.presentationOffsetY / self.zoom))
 end
 
 function Camera:detach()
@@ -98,14 +100,26 @@ end
 function Camera:screenToWorld(screenX, screenY)
     return (screenX - self.viewportWidth / 2) / self.zoom + self.x,
            (screenY - self.viewportHeight / 2) / self.zoom + self.y
+               + self.presentationOffsetY / self.zoom
+end
+
+function Camera:worldToScreen(worldX, worldY)
+    return (worldX - self.x) * self.zoom + self.viewportWidth / 2,
+           (worldY - self.y) * self.zoom + self.viewportHeight / 2
+               - self.presentationOffsetY
+end
+
+function Camera:setPresentationOffset(y)
+    self.presentationOffsetY = tonumber(y) or 0
 end
 
 function Camera:getVisibleBounds(margin)
     margin = margin or 0
     local halfWidth = self.viewportWidth / (2 * self.zoom)
     local halfHeight = self.viewportHeight / (2 * self.zoom)
-    return self.x - halfWidth - margin, self.y - halfHeight - margin,
-           self.x + halfWidth + margin, self.y + halfHeight + margin
+    local effectiveY = self.y + self.presentationOffsetY / self.zoom
+    return self.x - halfWidth - margin, effectiveY - halfHeight - margin,
+           self.x + halfWidth + margin, effectiveY + halfHeight + margin
 end
 
 function Camera:mousepressed(x, y, button)

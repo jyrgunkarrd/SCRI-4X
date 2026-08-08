@@ -4,16 +4,27 @@ AgentSystem.__index = AgentSystem
 local PORTRAIT_DIR = "assets/images/agents"
 local PORTRAIT_RADIUS_IN_HEXES = 0.78
 
-local function parseTile(tile)
-    if type(tile) ~= "string" then return nil, nil, "Tile must be a string." end
-    local letters, rowText = tile:upper():match("^%s*([A-Z]+)(%d+)%s*$")
-    if not letters then return nil, nil, "Invalid tile: " .. tile end
-
-    local column = 0
-    for index = 1, #letters do
-        column = column * 26 + letters:byte(index) - string.byte("A") + 1
+local function findSpawner(spawners, id)
+    local matchedKey
+    for key, value in pairs(spawners) do
+        if value == id then
+            if matchedKey then
+                return nil, nil, nil, ("Multiple spawners match Agent %s (%s and %s)."):format(
+                    tostring(id), tostring(matchedKey), tostring(key))
+            end
+            matchedKey = key
+        end
     end
-    return column, tonumber(rowText)
+    if not matchedKey then
+        return nil, nil, nil, "No map spawner matches Agent " .. tostring(id) .. "."
+    end
+
+    local column, row = tostring(matchedKey):match("^(%d+),(%d+)$")
+    if not column then
+        return nil, nil, nil, ("Agent %s spawner has an invalid tile key: %s."):format(
+            tostring(id), tostring(matchedKey))
+    end
+    return tonumber(column), tonumber(row), matchedKey
 end
 
 local function loadPortrait(id)
@@ -30,10 +41,11 @@ local function loadPortrait(id)
     return image, path
 end
 
-function AgentSystem.new(map, assetLayer, definitions)
+function AgentSystem.new(map, assetLayer, spawners, definitions)
     return setmetatable({
         map = map,
         assetLayer = assetLayer,
+        spawners = spawners or {},
         definitions = definitions or require("data.agents.index"),
         instances = {},
     }, AgentSystem)
@@ -44,11 +56,11 @@ function AgentSystem:spawn(id)
     local definition = self.definitions[id]
     if not definition then return nil, "Unknown agent ID: " .. tostring(id) end
 
-    local column, row, tileError = parseTile(definition.start)
-    if not column then return nil, ("Agent %s: %s"):format(id, tileError) end
+    local column, row, tile, spawnerError = findSpawner(self.spawners, id)
+    if not column then return nil, spawnerError end
     if column < 1 or column > self.map.columns or row < 1 or row > self.map.rows then
-        return nil, ("Agent %s start tile %s is outside the map."):format(
-            id, tostring(definition.start))
+        return nil, ("Agent %s spawner tile %s is outside the map."):format(
+            id, tostring(tile))
     end
 
     local image, portraitPath = loadPortrait(id)
@@ -60,9 +72,11 @@ function AgentSystem:spawn(id)
         definition = definition,
         column = column,
         row = row,
-        tile = definition.start,
+        tile = tile,
         portraitPath = portraitPath,
         image = image,
+        maxMovementPoints = tonumber(definition.spd or definition.SPD) or 0,
+        movementPoints = tonumber(definition.spd or definition.SPD) or 0,
     }
     instance.asset = self.assetLayer:add({
         kind = "agent",
@@ -80,6 +94,6 @@ function AgentSystem:get(id)
     return self.instances[id]
 end
 
-AgentSystem.parseTile = parseTile
+AgentSystem.findSpawner = findSpawner
 
 return AgentSystem

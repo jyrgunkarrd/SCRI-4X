@@ -56,11 +56,83 @@ function UnitSystem:createStack(entries, source)
             qty = quantity,
             image = image,
             imageError = imageError,
+            instances = {},
         }
+        for instanceIndex = 1, quantity do
+            unit.instances[#unit.instances + 1] = {
+                id = id,
+                definition = definition,
+                image = image,
+                imageError = imageError,
+                instance = instanceIndex,
+            }
+        end
         stack[#stack + 1] = unit
         byId[id] = unit
     end
     return stack, byId
+end
+
+function UnitSystem:createSlottedStack(entries, source)
+    assert(type(entries) == "table", source .. " must provide unit_slots")
+    local slots, slotsByName = {}, {}
+    local stack, byId = {}, {}
+
+    for entryIndex, entry in ipairs(entries) do
+        assert(type(entry) == "table",
+            ("%s slot entry %d must be a table"):format(source, entryIndex))
+        local slotName, unitId
+        local fieldCount = 0
+        for key, value in pairs(entry) do
+            fieldCount = fieldCount + 1
+            slotName, unitId = key, value
+        end
+        assert(fieldCount == 1 and type(slotName) == "string"
+            and slotName:match("^slot%d+$"),
+            ("%s slot entry %d must contain one slot<number> field"):format(
+                source, entryIndex))
+        assert(type(unitId) == "string" and unitId ~= "",
+            ("%s %s is missing a unit ID"):format(source, slotName))
+        assert(not slotsByName[slotName],
+            ("%s contains duplicate %s"):format(source, slotName))
+
+        local definition = self.definitions[unitId]
+        assert(definition,
+            ("%s %s references unknown unit ID %s"):format(
+                source, slotName, unitId))
+        local image, imageError = self:loadImage(unitId)
+        local instance = {
+            id = unitId,
+            definition = definition,
+            image = image,
+            imageError = imageError,
+            slot = slotName,
+            slotIndex = tonumber(slotName:match("%d+")),
+        }
+        slots[#slots + 1] = instance
+        slotsByName[slotName] = instance
+
+        local unit = byId[unitId]
+        if not unit then
+            unit = {
+                id = unitId,
+                definition = definition,
+                name = definition.name or unitId,
+                qty = 0,
+                image = image,
+                imageError = imageError,
+                instances = {},
+            }
+            stack[#stack + 1] = unit
+            byId[unitId] = unit
+        end
+        unit.qty = unit.qty + 1
+        unit.instances[#unit.instances + 1] = instance
+        instance.instance = unit.qty
+    end
+
+    table.sort(slots, function(a, b) return a.slotIndex < b.slotIndex end)
+    return stack, byId, slots, slotsByName
 end
 
 function UnitSystem:assignStack(assignment, config, source)
@@ -71,11 +143,52 @@ function UnitSystem:assignStack(assignment, config, source)
     local agent = assignment.agentsById[config.war_stack]
     assert(agent, ("%s targets Agent %s, which is not part of faction %s"):format(
         source, config.war_stack, assignment.factionId))
-    local stack, byId = self:createStack(config.stack_units, source)
+    local stack, byId, slots, slotsByName
+    if config.unit_slots then
+        stack, byId, slots, slotsByName = self:createSlottedStack(
+            config.unit_slots, source)
+    else
+        stack, byId = self:createStack(config.stack_units, source)
+        slots, slotsByName = {}, {}
+    end
     agent.units = stack
     agent.unitsById = byId
     agent.stack = stack
+    agent.unitSlots = slots
+    agent.unitSlotsByName = slotsByName
     return agent
+end
+
+function UnitSystem:removeInstance(agent, instance)
+    if instance.slot and agent.unitSlotsByName then
+        agent.unitSlotsByName[instance.slot] = nil
+    end
+    for index = #(agent.unitSlots or {}), 1, -1 do
+        if agent.unitSlots[index] == instance then
+            table.remove(agent.unitSlots, index)
+            break
+        end
+    end
+
+    local unit = agent.unitsById and agent.unitsById[instance.id]
+    if not unit then return false end
+    for index = #unit.instances, 1, -1 do
+        if unit.instances[index] == instance then
+            table.remove(unit.instances, index)
+            unit.qty = unit.qty - 1
+            break
+        end
+    end
+    if unit.qty <= 0 then
+        agent.unitsById[instance.id] = nil
+        for index = #agent.units, 1, -1 do
+            if agent.units[index] == unit then
+                table.remove(agent.units, index)
+                break
+            end
+        end
+    end
+    return true
 end
 
 return UnitSystem

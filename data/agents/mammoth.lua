@@ -3,8 +3,13 @@ return
 {
 
     id = "MAM",
-    name = "Mammoth",
-    start = "A200",
+    name = "Iron\nMammoth",
     spd = 10,
+    shouts = {
+
+        select = "As a river bends",
+        battle = "As songs end",
+
+    },
 
 }

@@ -3,10 +3,20 @@ return
 
  fac_id = "GLPD",
  war_stack = "MAC",
- stack_units = {
+ unit_slots = {
 
-    { unit_id = "FORG", qty = 8 },
-    { unit_id = "6WIFV", qty = 4 },
+    { slot1 = "FORG" },
+    { slot2 = "FORG" },
+    { slot3 = "FORG" },
+    { slot4 = "FORG" },
+    { slot5 = "FORG" },
+    { slot6 = "FORG" },
+    { slot7 = "FORG" },
+    { slot8 = "FORG" },
+    { slot9 = "6WIFV" },
+    { slot10 = "6WIFV" },
+    { slot11 = "6WIFV" },
+    { slot12 = "6WIFV" },
 
  },
 

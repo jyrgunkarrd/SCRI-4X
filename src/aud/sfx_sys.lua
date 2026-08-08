@@ -34,6 +34,13 @@ function SfxSystem:play(name)
     return true
 end
 
+function SfxSystem:playIfExists(name)
+    local path = self.directory .. "/" .. name
+    local info = love.filesystem.getInfo(path)
+    if not info or info.type ~= "file" then return false end
+    return self:play(name)
+end
+
 function SfxSystem:setVolume(volume)
     self.volume = math.max(0, math.min(1, tonumber(volume) or 1))
     for _, source in pairs(self.sources) do source:setVolume(self.volume) end

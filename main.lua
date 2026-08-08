@@ -46,6 +46,7 @@ if hasArg("--map-editor") then
     function love.draw() mapEditor.draw() end
     function love.resize(w, h) mapEditor.resize(w, h) end
     function love.keypressed(...) mapEditor.keypressed(...) end
+    function love.textinput(...) mapEditor.textinput(...) end
     function love.mousepressed(...) mapEditor.mousepressed(...) end
     function love.mousereleased(...) mapEditor.mousereleased(...) end
     function love.mousemoved(...) mapEditor.mousemoved(...) end

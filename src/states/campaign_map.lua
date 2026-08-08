@@ -7,8 +7,11 @@ local FactionSystem = require("src.sys.faction_sys")
 local MoveSystem = require("src.sys.move_sys")
 local UnitSystem = require("src.sys.unit_sys")
 local CombatSystem = require("src.sys.combat_sys")
+local BattleCardSystem = require("src.sys.battle_card_sys")
+local AgentProfileSystem = require("src.sys.agent_profile_sys")
 local MouseControls = require("src.input.mouse_controls")
 local CombatUIX = require("src.rndr.combat_uix")
+local AgentPanelUIX = require("src.rndr.agent_panel_uix")
 local SfxSystem = require("src.aud.sfx_sys")
 
 local CampaignMap = {}
@@ -39,7 +42,7 @@ function CampaignMap:load()
     local mapData = require("data.map")
     self.map = MapDraw.new(mapData.columns or 200, mapData.rows or 200, 42, mapData.tiles)
     self.assetLayer = AssetLayer.new(self.map)
-    self.agentSystem = AgentSystem.new(self.map, self.assetLayer)
+    self.agentSystem = AgentSystem.new(self.map, self.assetLayer, mapData.spawners)
     self.factionSystem = FactionSystem.new(self.agentSystem)
     local player, assignmentError = self.factionSystem:assignPlayerFromDevConfig()
     assert(player, assignmentError)
@@ -62,12 +65,38 @@ function CampaignMap:load()
     self.overlayLayer = OverlayLayer.new(self.map)
     self.moveSystem = MoveSystem.new(self.map, self.overlayLayer)
     self.sfxSystem = SfxSystem.new()
-    self.combatSystem = CombatSystem.new(self.factionSystem, self.sfxSystem)
-    self.moveSystem:setDestinationHandler(function(agent, column, row)
-        return self.combatSystem:handleDestination(agent, column, row)
+    self.battleCardSystem = BattleCardSystem.new()
+    self.combatSystem = CombatSystem.new(self.factionSystem, self.sfxSystem,
+        self.battleCardSystem, self.unitSystem)
+    self.combatSystem:setPreBattleShoutHandler(function(agent, shoutKey)
+        self.sfxSystem:playIfExists(
+            "voices/" .. tostring(agent.id) .. ".wav")
+        return self.overlayLayer:playAgentShout(agent, shoutKey)
+    end, function()
+        self.overlayLayer:clearAgentShout()
+    end)
+    self.moveSystem:setTraversalRules({
+        isOccupied = function(agent, column, row)
+            return self.combatSystem:isOccupied(column, row, agent)
+        end,
+        zoneController = function(agent, column, row)
+            return self.combatSystem:zoneControllerAt(column, row, agent)
+        end,
+    })
+    self.moveSystem:setArrivalHandler(function(agent, column, row, controller)
+        return self.combatSystem:handleZoneEntry(agent, column, row, controller)
+    end)
+    self.moveSystem:setMovementStartHandler(function()
+        self.sfxSystem:play("move.wav")
+    end)
+    self.moveSystem:setCommandRule(function(agent)
+        return agent.factionId == player.factionId
     end)
     self.mouseControls = MouseControls.new(self.map, self.camera, self.assetLayer,
         self.moveSystem, self.factionSystem, self.sfxSystem)
+    self.agentProfileSystem = AgentProfileSystem.new(self.moveSystem)
+    self.agentPanelUIX = AgentPanelUIX.new(
+        self.agentProfileSystem, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
     self.combatUIX = CombatUIX.new(self.combatSystem, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
     self:updateViewport()
 end
@@ -78,11 +107,26 @@ end
 
 function CampaignMap:update(dt)
     local mouseX, mouseY = self:toVirtual(love.mouse.getPosition())
+    self.agentPanelUIX:update(dt)
+    self.camera:setPresentationOffset(self.agentPanelUIX:cameraOffset())
+    self.overlayLayer:update(dt)
+    self.combatSystem:update(dt)
     if self.combatSystem:isActive() then
         self.combatUIX:update(dt, mouseX, mouseY)
+        if self.combatUIX:isEntranceComplete() then
+            if self.combatSystem:drawBattleCards() then
+                self.combatUIX:startResultAnimation(self.combatSystem.activeBattle)
+            end
+        end
         return
     end
-    self.camera:update(dt, mouseX, mouseY)
+    self.moveSystem:update(dt)
+    if self.agentPanelUIX:contains(mouseX, mouseY) then
+        self.camera:update(dt)
+    else
+        self.camera:update(dt, mouseX, mouseY)
+        self.mouseControls:updateHover(mouseX, mouseY)
+    end
 end
 
 function CampaignMap:draw()
@@ -93,10 +137,12 @@ function CampaignMap:draw()
     self.overlayLayer:draw(self.camera)
     self.assetLayer:draw()
     self.camera:detach()
+    self.overlayLayer:drawSelectedShout(self.camera)
 
     love.graphics.setColor(1, 1, 1, 0.85)
     love.graphics.print(
         "Left: select    Right: move    Middle-drag: pan    Wheel: zoom", 24, 24)
+    self.agentPanelUIX:draw()
     self.combatUIX:draw()
     love.graphics.setCanvas()
 
@@ -109,6 +155,7 @@ end
 function CampaignMap:mousepressed(x, y, button)
     local virtualX, virtualY = self:toVirtual(x, y)
     if self.combatUIX:mousepressed(virtualX, virtualY, button) then return end
+    if self.agentPanelUIX:contains(virtualX, virtualY) then return end
     self.mouseControls:mousepressed(virtualX, virtualY, button)
     self.camera:mousepressed(virtualX, virtualY, button)
 end
@@ -131,6 +178,7 @@ function CampaignMap:wheelmoved(x, y)
         self.combatUIX:wheelmoved(mouseX, mouseY, y)
         return
     end
+    if self.agentPanelUIX:contains(mouseX, mouseY) then return end
     self.camera:wheelmoved(x, y, mouseX, mouseY)
 end
 

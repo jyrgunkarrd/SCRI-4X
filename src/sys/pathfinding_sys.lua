@@ -147,7 +147,10 @@ function PathfindingSystem.reachable(map, startColumn, startRow, budget, options
         local current = heapPop(heap)
         local currentKey = key(current.column, current.row)
         if current.cost == costs[currentKey] then
-            for _, neighbor in ipairs(neighbors(map, current.column, current.row)) do
+            local shouldStop = currentKey ~= startKey and options.stopAt
+                and options.stopAt(current.column, current.row)
+            for _, neighbor in ipairs(shouldStop and {}
+                or neighbors(map, current.column, current.row)) do
                 if passable(options, neighbor.column, neighbor.row) then
                     local cost = current.cost + stepCost(options,
                         current.column, current.row, neighbor.column, neighbor.row)

@@ -33,12 +33,22 @@ function AssetLayer:draw()
     for _, asset in ipairs(self.assets) do
         if asset.visible ~= false then
             local x, y = self.map:hexCenter(asset.column, asset.row)
+            x, y = asset.drawX or x, asset.drawY or y
             local image = asset.image
-            love.graphics.setColor(asset.color or { 1, 1, 1, 1 })
+            local pulse = asset.previewPulse
+                and (0.5 + 0.5 * math.sin(love.timer.getTime() * 9)) or 0
+            local pulseScale = 1 + pulse * 0.1
+            if asset.previewPulse then
+                love.graphics.setColor(1, 0.35 + pulse * 0.35,
+                    0.35 + pulse * 0.35, 1)
+            else
+                love.graphics.setColor(asset.color or { 1, 1, 1, 1 })
+            end
             love.graphics.draw(image,
                 x + (asset.offsetX or 0), y + (asset.offsetY or 0),
-                asset.rotation or 0, asset.scaleX or asset.scale or 1,
-                asset.scaleY or asset.scale or 1,
+                asset.rotation or 0,
+                (asset.scaleX or asset.scale or 1) * pulseScale,
+                (asset.scaleY or asset.scale or 1) * pulseScale,
                 asset.originX or image:getWidth() / 2,
                 asset.originY or image:getHeight() / 2)
         end

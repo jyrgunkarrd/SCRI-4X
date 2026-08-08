@@ -3,8 +3,13 @@ return
 {
 
     id = "MAC",
-    name = "Mac the Lion",
-    start = "B198",
+    name = "Mac\nThe Lion",
     spd = 10,
+    shouts = {
+
+        select = "Pride in service",
+        battle = "Hands up",
+
+    },
 
 }
