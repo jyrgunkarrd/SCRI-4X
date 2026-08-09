@@ -30,6 +30,8 @@ function MapDraw.new(columns, rows, radius, tiles)
     self.fillB = { 0.10, 0.18, 0.21, 1 }
     self.textColor = { 0.74, 0.86, 0.88, 1 }
     self.tiles = tiles or {}
+    self.showGrid = true
+    self.showCoordinates = true
     return self
 end
 
@@ -94,15 +96,20 @@ function MapDraw:draw(camera)
             local x, y = self:hexCenter(column, row)
             local points = self:vertices(x, y)
             local tileColor = self.tiles[column .. "," .. row]
+            if self.fillProvider then tileColor = self.fillProvider(column, row, tileColor) end
             love.graphics.setColor(tileColor or ((column + row) % 2 == 0 and self.fillA or self.fillB))
             love.graphics.polygon("fill", points)
-            love.graphics.setColor(self.lineColor)
-            love.graphics.polygon("line", points)
+            if self.showGrid then
+                love.graphics.setColor(self.lineColor)
+                love.graphics.polygon("line", points)
+            end
 
-            love.graphics.setColor(self.textColor)
-            local label = columnName(column) .. row
-            love.graphics.printf(label, x - self.hexWidth / 2, y - self.font:getHeight() / 2,
-                self.hexWidth, "center")
+            if self.showCoordinates then
+                love.graphics.setColor(self.textColor)
+                local label = columnName(column) .. row
+                love.graphics.printf(label, x - self.hexWidth / 2,
+                    y - self.font:getHeight() / 2, self.hexWidth, "center")
+            end
         end
     end
 

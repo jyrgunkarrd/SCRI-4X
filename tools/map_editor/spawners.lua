@@ -6,14 +6,20 @@ local utf8 = require("utf8")
 local BADGES = {
     entries = { label = "A", name = "Agent spawner", color = { 1, 0.68, 0.16, 1 } },
     sites = { label = "S", name = "Site", color = { 0.35, 0.8, 1, 1 } },
+    terrain = { label = "T", name = "Terrain spawner", color = { 1, 0.1, 0.85, 1 } },
+    resources = { label = "R", name = "Resource spawner", color = { 0.55, 1, 0.55, 1 } },
 }
 
-function Spawners.new(map, camera, entries, sites, onMessage)
+local BADGE_ORDER = { "entries", "sites", "terrain", "resources" }
+
+function Spawners.new(map, camera, entries, sites, terrain, resources, onMessage)
     return setmetatable({
         map = map,
         camera = camera,
         entries = entries or {},
         sites = sites or {},
+        terrain = terrain or {},
+        resources = resources or {},
         onMessage = onMessage,
         hoveredKey = nil,
         hoveredType = nil,
@@ -29,20 +35,23 @@ function Spawners:isEditing()
 end
 
 function Spawners:badgeLayout(key)
-    local hasAgent = self.entries[key] ~= nil
-    local hasSite = self.sites[key] ~= nil
-    local size = self.map.radius * (hasAgent and hasSite and 0.54 or 0.72)
-    if hasAgent and hasSite then
-        local offset = size * 0.56
-        return {
-            entries = { x = -offset, size = size },
-            sites = { x = offset, size = size },
+    local active = {}
+    for _, badgeType in ipairs(BADGE_ORDER) do
+        if self[badgeType][key] ~= nil then active[#active + 1] = badgeType end
+    end
+    local count = #active
+    local sizeFactor = count == 1 and 0.72
+        or count == 2 and 0.54 or count == 3 and 0.46 or 0.36
+    local size = self.map.radius * sizeFactor
+    local spacing = size * 1.12
+    local layout = {}
+    for index, badgeType in ipairs(active) do
+        layout[badgeType] = {
+            x = (index - (count + 1) / 2) * spacing,
+            size = size,
         }
     end
-    return {
-        entries = hasAgent and { x = 0, size = size } or nil,
-        sites = hasSite and { x = 0, size = size } or nil,
-    }
+    return layout
 end
 
 function Spawners:updateHover(screenX, screenY)
@@ -54,14 +63,17 @@ function Spawners:updateHover(screenX, screenY)
     if not self.hoveredKey then return end
 
     local layout = self:badgeLayout(self.hoveredKey)
-    if layout.entries and layout.sites then
-        local centerX = self.map:hexCenter(column, row)
-        self.hoveredType = math.abs(worldX - (centerX + layout.entries.x))
-            <= math.abs(worldX - (centerX + layout.sites.x)) and "entries" or "sites"
-    elseif layout.entries then
-        self.hoveredType = "entries"
-    elseif layout.sites then
-        self.hoveredType = "sites"
+    local closestDistance
+    for _, badgeType in ipairs(BADGE_ORDER) do
+        local badgeLayout = layout[badgeType]
+        if badgeLayout then
+            local centerX = self.map:hexCenter(column, row)
+            local distance = math.abs(worldX - (centerX + badgeLayout.x))
+            if not closestDistance or distance < closestDistance then
+                closestDistance = distance
+                self.hoveredType = badgeType
+            end
+        end
     end
 end
 
@@ -87,6 +99,8 @@ function Spawners:draw()
     local keys = {}
     for key in pairs(self.entries) do keys[key] = true end
     for key in pairs(self.sites) do keys[key] = true end
+    for key in pairs(self.terrain) do keys[key] = true end
+    for key in pairs(self.resources) do keys[key] = true end
     for key in pairs(keys) do
         local column, row = key:match("^(%d+),(%d+)$")
         column, row = tonumber(column), tonumber(row)
@@ -95,6 +109,10 @@ function Spawners:draw()
             local layout = self:badgeLayout(key)
             if layout.entries then drawBadge(self, "entries", x, y, layout.entries, font) end
             if layout.sites then drawBadge(self, "sites", x, y, layout.sites, font) end
+            if layout.terrain then drawBadge(self, "terrain", x, y, layout.terrain, font) end
+            if layout.resources then
+                drawBadge(self, "resources", x, y, layout.resources, font)
+            end
         end
     end
     love.graphics.setLineWidth(1)
@@ -159,6 +177,12 @@ function Spawners:keypressed(key)
         return true
     elseif key == "s" and self.hoveredKey then
         self:beginEditing("sites", key)
+        return true
+    elseif key == "t" and self.hoveredKey then
+        self:beginEditing("terrain", key)
+        return true
+    elseif key == "r" and self.hoveredKey then
+        self:beginEditing("resources", key)
         return true
     elseif (key == "delete" or key == "backspace") and self.hoveredKey and self.hoveredType then
         self[self.hoveredType][self.hoveredKey] = nil

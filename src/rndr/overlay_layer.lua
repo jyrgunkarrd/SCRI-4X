@@ -14,9 +14,8 @@ function OverlayLayer.new(map)
         selectedAsset = nil,
         previewAsset = nil,
         previewPath = nil,
+        provinceMask = nil,
         movementColor = { 0.15, 0.62, 0.88, 0.32 },
-        selectionFill = { 1, 0.78, 0.16, 0.24 },
-        selectionLine = { 1, 0.88, 0.28, 1 },
         shoutElapsed = nil,
         shoutCharactersPerSecond = 48,
         shoutPauseDuration = 0.6,
@@ -109,7 +108,9 @@ function OverlayLayer:setZoneCells(cells)
 end
 
 function OverlayLayer:setSelectedAsset(asset)
+    if self.selectedAsset then self.selectedAsset.selected = false end
     self.selectedAsset = asset
+    if self.selectedAsset then self.selectedAsset.selected = true end
     local definition = asset and asset.owner and asset.owner.definition
     local shout = definition and definition.shouts and definition.shouts.select
     self.shoutAsset = nil
@@ -123,12 +124,42 @@ function OverlayLayer:setMovementPreview(asset, path)
     self.previewPath = path
 end
 
+function OverlayLayer:setProvinceMask(mask)
+    self.provinceMask = mask
+end
+
+function OverlayLayer:drawProvinceDimming(camera)
+    if not self.provinceMask then return end
+    local left, top, right, bottom = camera:getVisibleBounds(self.map.radius)
+    local firstRow = math.max(1,
+        math.floor((top - self.map.originY) / self.map.rowStep) + 1)
+    local lastRow = math.min(self.map.rows,
+        math.ceil((bottom - self.map.originY) / self.map.rowStep) + 1)
+    love.graphics.setColor(0, 0, 0, 0.68)
+    for row = firstRow, lastRow do
+        local rowOffset = row % 2 == 0 and self.map.hexWidth / 2 or 0
+        local firstColumn = math.max(1,
+            math.floor((left - self.map.originX - rowOffset) / self.map.hexWidth) + 1)
+        local lastColumn = math.min(self.map.columns,
+            math.ceil((right - self.map.originX - rowOffset) / self.map.hexWidth) + 1)
+        for column = firstColumn, lastColumn do
+            if not self.provinceMask[column .. "," .. row] then
+                local x, y = self.map:hexCenter(column, row)
+                love.graphics.polygon("fill", self.map:vertices(x, y))
+            end
+        end
+    end
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
 function OverlayLayer:clear()
     self.movementCells = {}
     self.zoneCells = {}
+    if self.selectedAsset then self.selectedAsset.selected = false end
     self.selectedAsset = nil
     self.previewAsset = nil
     self.previewPath = nil
+    self.provinceMask = nil
 end
 
 function OverlayLayer:draw(camera)
@@ -174,18 +205,6 @@ function OverlayLayer:draw(camera)
         end
     end
 
-    local asset = self.selectedAsset
-    if asset then
-        local x, y = self.map:hexCenter(asset.column, asset.row)
-        x, y = asset.drawX or x, asset.drawY or y
-        local points = self.map:vertices(x, y)
-        love.graphics.setColor(self.selectionFill)
-        love.graphics.polygon("fill", points)
-        love.graphics.setColor(self.selectionLine)
-        love.graphics.setLineWidth(5 / camera.zoom)
-        love.graphics.polygon("line", points)
-        love.graphics.setLineWidth(1)
-    end
     love.graphics.setColor(1, 1, 1, 1)
 end
 

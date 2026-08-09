@@ -70,12 +70,26 @@ function FactionSystem:assignPlayerFromDevConfig()
     return self:assignPlayer(config.fac_id)
 end
 
-function FactionSystem:assignNonPlayerFromDevConfig()
-    local config = require("data.dev_opfor")
-    if type(config) ~= "table" or type(config.fac_id) ~= "string" then
-        return nil, "data/dev_opfor.lua must return a table with fac_id."
+function FactionSystem:assignAllNonPlayers()
+    if not self.player then
+        return nil, "The player faction must be assigned before NPC factions."
     end
-    return self:assignNonPlayer(config.fac_id)
+
+    local factionIds = {}
+    for factionId in pairs(self.definitions) do
+        if factionId ~= self.player.factionId then
+            factionIds[#factionIds + 1] = factionId
+        end
+    end
+    table.sort(factionIds)
+
+    local assignments = {}
+    for _, factionId in ipairs(factionIds) do
+        local assignment, assignmentError = self:assignNonPlayer(factionId)
+        if not assignment then return nil, assignmentError end
+        assignments[#assignments + 1] = assignment
+    end
+    return assignments
 end
 
 function FactionSystem:getPlayer()

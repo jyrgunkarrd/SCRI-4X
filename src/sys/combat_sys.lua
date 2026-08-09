@@ -235,6 +235,8 @@ end
 
 function CombatSystem:dismiss()
     if not self.activeBattle then return false end
+    local attacker = self.activeBattle.attacker and self.activeBattle.attacker.agent
+    if attacker and attacker.asset then attacker.asset.deferExhaustionDimming = false end
     self.activeBattle = nil
     return true
 end

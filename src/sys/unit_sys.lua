@@ -135,28 +135,29 @@ function UnitSystem:createSlottedStack(entries, source)
     return stack, byId, slots, slotsByName
 end
 
-function UnitSystem:assignStack(assignment, config, source)
-    source = source or "unit stack config"
-    assert(type(config) == "table", source .. " must return a table")
-    assert(type(config.war_stack) == "string" and config.war_stack ~= "",
-        source .. " must provide war_stack")
-    local agent = assignment.agentsById[config.war_stack]
-    assert(agent, ("%s targets Agent %s, which is not part of faction %s"):format(
-        source, config.war_stack, assignment.factionId))
-    local stack, byId, slots, slotsByName
-    if config.unit_slots then
-        stack, byId, slots, slotsByName = self:createSlottedStack(
-            config.unit_slots, source)
-    else
-        stack, byId = self:createStack(config.stack_units, source)
-        slots, slotsByName = {}, {}
-    end
+function UnitSystem:assignAgentStack(agent)
+    assert(type(agent) == "table" and type(agent.id) == "string",
+        "Unit stack assignment requires an Agent instance.")
+    local source = "Agent " .. agent.id .. " definition"
+    local definition = agent.definition
+    assert(type(definition) == "table", source .. " is missing.")
+    assert(type(definition.unit_slots) == "table",
+        source .. " must provide unit_slots.")
+    local stack, byId, slots, slotsByName = self:createSlottedStack(
+        definition.unit_slots, source)
     agent.units = stack
     agent.unitsById = byId
     agent.stack = stack
     agent.unitSlots = slots
     agent.unitSlotsByName = slotsByName
     return agent
+end
+
+function UnitSystem:assignFactionStacks(assignment)
+    assert(type(assignment) == "table" and type(assignment.agents) == "table",
+        "Faction stack assignment requires a faction assignment.")
+    for _, agent in ipairs(assignment.agents) do self:assignAgentStack(agent) end
+    return assignment
 end
 
 function UnitSystem:removeInstance(agent, instance)

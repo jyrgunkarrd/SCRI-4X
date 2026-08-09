@@ -34,10 +34,16 @@ function Camera:setBounds(left, top, right, bottom, padding)
     self:clampToBounds()
 end
 
+function Camera:setScreenPadding(pixels)
+    self.screenPadding = tonumber(pixels)
+    self:clampToBounds()
+end
+
 function Camera:clampToBounds()
     if not self.bounds then return end
 
-    local padding = self.boundsPadding
+    local padding = self.screenPadding and self.screenPadding / self.zoom
+        or self.boundsPadding
     local halfWidth = self.viewportWidth / (2 * self.zoom)
     local halfHeight = self.viewportHeight / (2 * self.zoom)
     local minX = self.bounds.left - padding + halfWidth

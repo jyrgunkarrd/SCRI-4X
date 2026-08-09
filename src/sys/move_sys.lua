@@ -119,6 +119,7 @@ end
 function MoveSystem:resetMovement(entity)
     entity.maxMovementPoints = entity.maxMovementPoints or self:movementBudget(entity)
     entity.movementPoints = entity.maxMovementPoints
+    if entity.asset then entity.asset.deferExhaustionDimming = false end
     if entity == self.selected then self:refreshRange() end
 end
 
@@ -241,7 +242,10 @@ function MoveSystem:moveSelectedTo(column, row)
     self.selected.movementPoints = math.max(0,
         self:remainingMovement(self.selected) - costOrError)
     local controller = self:controllerAt(column, row)
-    if controller then self.selected.movementPoints = 0 end
+    if controller then
+        self.selected.movementPoints = 0
+        if self.selected.asset then self.selected.asset.deferExhaustionDimming = true end
+    end
     if self.previewEnemyAsset then self.previewEnemyAsset.previewPulse = false end
     self.previewEnemyAsset = nil
     self.previewCost = nil

@@ -77,14 +77,17 @@ function SiteSystem:place(id, tile)
     instance.assets.role = self.assetLayer:add({
         kind = "site_role", owner = instance, image = roleImage,
         column = column, row = row, offsetY = -badgeOffset, scale = roleScale,
+        drawOrder = 10,
     })
     instance.assets.main = self.assetLayer:add({
         kind = "site", owner = instance, image = mainImage,
         column = column, row = row, scale = mainScale,
+        drawOrder = 10,
     })
     instance.assets.level = self.assetLayer:add({
         kind = "site_level", owner = instance, image = levelImage,
         column = column, row = row, offsetY = badgeOffset, scale = levelScale,
+        drawOrder = 10,
     })
     self.instances[#self.instances + 1] = instance
     self.instancesByTile[tile] = instance
