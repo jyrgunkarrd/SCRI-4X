@@ -61,7 +61,10 @@ function MoveSystem:update(dt)
     asset.drawX, asset.drawY = nil, nil
     self.movementAnimation = nil
     self:refreshRange()
-    if animation.controller and self.arrivalHandler then
+    if animation.onArrival then
+        animation.onArrival(animation.entity, animation.column, animation.row,
+            animation.controller)
+    elseif animation.controller and self.arrivalHandler then
         self.arrivalHandler(animation.entity, animation.column, animation.row,
             animation.controller)
     end
@@ -219,6 +222,44 @@ function MoveSystem:move(entity, column, row, budget, options)
     return path, costOrError
 end
 
+function MoveSystem:animatePath(entity, path, cost, controller, options)
+    if self:isAnimating() then return nil, "An asset is already moving." end
+    if type(path) ~= "table" or #path == 0 then return nil, "Movement path is empty." end
+    options = options or {}
+    local destination = path[#path]
+    entity.column, entity.row = destination.column, destination.row
+    if entity.asset then
+        entity.asset.column, entity.asset.row = destination.column, destination.row
+    end
+    entity.movementPoints = math.max(0,
+        self:remainingMovement(entity) - (tonumber(cost) or 0))
+    if controller then
+        entity.movementPoints = 0
+        if entity.asset and options.deferExhaustionDimming then
+            entity.asset.deferExhaustionDimming = true
+        end
+    end
+    self.lastPath = path
+    local start = path[1]
+    if entity.asset and start then
+        entity.asset.drawX, entity.asset.drawY =
+            self.map:hexCenter(start.column, start.row)
+    end
+    self.movementAnimation = {
+        entity = entity,
+        path = path,
+        column = destination.column,
+        row = destination.row,
+        controller = controller,
+        onArrival = options.onArrival,
+        segmentIndex = 1,
+        segmentDuration = self.secondsPerHex,
+        elapsed = 0,
+    }
+    if self.movementStartHandler then self.movementStartHandler(entity, path) end
+    return path, cost
+end
+
 function MoveSystem:moveSelectedTo(column, row)
     if self:isAnimating() then return nil, "An asset is already moving." end
     if not self.selected then return nil, "No asset is selected." end
@@ -239,38 +280,16 @@ function MoveSystem:moveSelectedTo(column, row)
             end,
         })
     if not path then return nil, costOrError end
-    self.selected.movementPoints = math.max(0,
-        self:remainingMovement(self.selected) - costOrError)
     local controller = self:controllerAt(column, row)
-    if controller then
-        self.selected.movementPoints = 0
-        if self.selected.asset then self.selected.asset.deferExhaustionDimming = true end
-    end
     if self.previewEnemyAsset then self.previewEnemyAsset.previewPulse = false end
     self.previewEnemyAsset = nil
     self.previewCost = nil
     self.overlayLayer:setMovementCells({})
     self.overlayLayer:setZoneCells({})
     self.overlayLayer:setMovementPreview(nil, nil)
-    local start = path[1]
-    if self.selected.asset and start then
-        self.selected.asset.drawX, self.selected.asset.drawY =
-            self.map:hexCenter(start.column, start.row)
-    end
-    self.movementAnimation = {
-        entity = self.selected,
-        path = path,
-        column = column,
-        row = row,
-        controller = controller,
-        segmentIndex = 1,
-        segmentDuration = self.secondsPerHex,
-        elapsed = 0,
-    }
-    if self.movementStartHandler then
-        self.movementStartHandler(self.selected, path)
-    end
-    return path, costOrError
+    return self:animatePath(self.selected, path, costOrError, controller, {
+        deferExhaustionDimming = controller ~= nil,
+    })
 end
 
 return MoveSystem

@@ -20,6 +20,7 @@ local AgentPanelUIX = require("src.rndr.agent_panel_uix")
 local SfxSystem = require("src.aud.sfx_sys")
 local TooltipSystem = require("src.sys.tooltip_sys")
 local TurnSystem = require("src.sys.turn_sys")
+local AIBehaviorSystem = require("src.sys.AI_bhav_sys")
 local ScreenUIX = require("src.rndr.screen_uix")
 
 local CampaignMap = {}
@@ -70,7 +71,7 @@ function CampaignMap:load()
     assert(player, assignmentError)
     local nonPlayers, oppositionError = self.factionSystem:assignAllNonPlayers()
     assert(nonPlayers, oppositionError)
-    self.turnSystem = TurnSystem.new(player.faction.name)
+    self.turnSystem = TurnSystem.new(player.faction.name, nonPlayers)
     self.screenUIX = ScreenUIX.new(self.turnSystem, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
 
     self.unitSystem = UnitSystem.new()
@@ -100,6 +101,11 @@ function CampaignMap:load()
     self.battleCardSystem = BattleCardSystem.new()
     self.combatSystem = CombatSystem.new(self.factionSystem, self.sfxSystem,
         self.battleCardSystem, self.unitSystem)
+    self.aiBehaviorSystem = AIBehaviorSystem.new(self.map, self.moveSystem,
+        self.combatSystem, self.factionSystem, self.turnSystem, self.overlayLayer)
+    self.turnSystem:setNpcPhaseHandler(function(faction)
+        self.aiBehaviorSystem:beginFaction(faction)
+    end)
     self.combatSystem:setPreBattleShoutHandler(function(agent, shoutKey)
         self.sfxSystem:playIfExists(
             "voices/" .. tostring(agent.id) .. ".wav")
@@ -157,6 +163,7 @@ function CampaignMap:update(dt)
         return
     end
     self.moveSystem:update(dt)
+    self.aiBehaviorSystem:update(dt)
     if self.agentPanelUIX:contains(mouseX, mouseY)
         or self.screenUIX:contains(mouseX, mouseY) then
         self.tooltipSystem:clear()
@@ -187,9 +194,11 @@ function CampaignMap:draw()
     self.map:draw(self.camera)
     self.overlayLayer:draw(self.camera)
     self.assetLayer:draw(self.camera)
+    self.overlayLayer:drawAgentUnitPips(self.agentSystem.instances)
     self.overlayLayer:drawProvinceDimming(self.camera)
     self.camera:detach()
     self.overlayLayer:drawSelectedShout(self.camera)
+    self.overlayLayer:drawCombatCasualties(self.camera)
 
     self.tooltipSystem:draw()
     self.agentPanelUIX:draw()

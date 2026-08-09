@@ -13,18 +13,18 @@ return
     },
     unit_slots = {
 
-        { slot1 = "BLAKBER" },
-        { slot2 = "BLAKBER" },
-        { slot3 = "BLAKBER" },
-        { slot4 = "BLAKBER" },
+        { slot1 = "IFVJUNK" },
+        { slot2 = "IFVJUNK" },
+        { slot3 = "IFVJUNK" },
+        { slot4 = "IFVJUNK" },
         { slot5 = "BLAKBER" },
         { slot6 = "BLAKBER" },
         { slot7 = "BLAKBER" },
         { slot8 = "BLAKBER" },
-        { slot9 = "IFVJUNK" },
-        { slot10 = "IFVJUNK" },
-        { slot11 = "IFVJUNK" },
-        { slot12 = "IFVJUNK" },
+        { slot9 = "BLAKBER" },
+        { slot10 = "BLAKBER" },
+        { slot11 = "BLAKBER" },
+        { slot12 = "BLAKBER" },
      
      },
 

@@ -41,6 +41,16 @@ function CombatAnim:start(battle)
     self.resolutionStart = nil
 end
 
+function CombatAnim:startRound(battle)
+    self.battle = battle
+    self.time = math.max(self.time, self.entranceDuration)
+    self.resultsStarted = false
+    self.resultsStart = nil
+    self.resultsEnd = nil
+    self.resolutionStarted = false
+    self.resolutionStart = nil
+end
+
 function CombatAnim:update(dt)
     self.time = self.time + dt
 end

@@ -4,6 +4,18 @@ return
 
     {
 
+        id = "DESP",
+        cards = {
+
+            { id = "DMG1", qty = 2 },
+            { id = "NIL", qty = 6 },
+
+        },
+
+    },
+
+    {
+
         id = "LINF",
         cards = {
 

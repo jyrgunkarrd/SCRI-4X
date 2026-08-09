@@ -50,6 +50,13 @@ function CombatUIX:resetViews(battle)
     self.resolutionSoundsPlayed = {}
 end
 
+function CombatUIX:startNextRound(battle)
+    self.battle = battle
+    self.animation:startRound(battle)
+    self.resultSoundsPlayed = {}
+    self.resolutionSoundsPlayed = {}
+end
+
 function CombatUIX:sideAt(x, y)
     local margin, gap, panelWidth, panelY, panelHeight = self:panelLayout()
     if y < panelY or y > panelY + panelHeight then return nil end
@@ -359,11 +366,13 @@ function CombatUIX:draw()
     end
 
     love.graphics.setColor(TEXT_COLOR)
-    love.graphics.printf("COMBAT", 0, 34, self.width, "center")
+    local roundLabel = battle.round and battle.round.label or "Combat"
+    love.graphics.printf(string.upper(roundLabel), 0, 34, self.width, "center")
     local prompt
     if self.animation:isComplete() then
         if battle.resolved and self.animation:isResolutionComplete() then
-            prompt = "Left-click to dismiss"
+            prompt = self.combatSystem:hasMoreRounds(battle)
+                and "Left-click for next round" or "Left-click to dismiss"
         elseif not battle.resolving and not battle.resolved then
             prompt = "Left-click to resolve combat"
         end
@@ -411,7 +420,9 @@ function CombatUIX:update(dt, mouseX, mouseY)
             end
         end
     end
-    local resolutionSounds = { blk = "blk.wav", dmg = "dmg.wav" }
+    local damageSound = battle.round and battle.round.type == "fire"
+        and "dmg_fire.wav" or "dmg.wav"
+    local resolutionSounds = { blk = "blk.wav", dmg = damageSound }
     for outcomeType, soundName in pairs(resolutionSounds) do
         local hasApplicableResult = false
         for _, side in ipairs({ battle.player, battle.opposition }) do
@@ -470,7 +481,11 @@ function CombatUIX:mousepressed(_, _, button)
     if button == 1 and self.animation:isComplete() then
         local battle = self.combatSystem.activeBattle
         if battle.resolved and self.animation:isResolutionComplete() then
-            self.combatSystem:dismiss()
+            if self.combatSystem:advanceRound() then
+                self:startNextRound(battle)
+            else
+                self.combatSystem:dismiss()
+            end
         elseif not battle.resolving and not battle.resolved then
             if self.combatSystem:resolve() then
                 self.animation:startResolution()

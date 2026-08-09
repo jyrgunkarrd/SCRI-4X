@@ -96,27 +96,31 @@ function BattleCardSystem:draw(deckId)
     error("Could not draw from battle deck " .. deckId)
 end
 
-function BattleCardSystem:drawForUnits(units)
+function BattleCardSystem:drawForUnits(units, deckType)
     local draws, results = {}, {}
     for _, unit in ipairs(units) do
-        local deckId = unit.definition.bat_deck
-        assert(type(deckId) == "string" and deckId ~= "",
-            "Unit " .. unit.id .. " does not define bat_deck")
-        for instance = 1, unit.qty do
-            local unitInstance = unit.instances and unit.instances[instance]
-            local card, outcomes = self:draw(deckId)
-            draws[#draws + 1] = {
-                unitId = unit.id,
-                instance = instance,
-                slot = unitInstance and unitInstance.slot or nil,
-                deckId = deckId,
-                card = card,
-            }
-            for _, outcome in ipairs(outcomes) do
-                outcome.unitId = unit.id
-                outcome.instance = instance
-                outcome.slot = unitInstance and unitInstance.slot or nil
-                results[#results + 1] = outcome
+        local deckField = deckType and (deckType .. "_deck") or "bat_deck"
+        local deckId = unit.definition[deckField] or unit.definition.bat_deck
+        if deckId ~= nil then
+            assert(type(deckId) == "string" and deckId ~= "",
+                "Unit " .. unit.id .. " has an invalid " .. deckField)
+            for instance = 1, unit.qty do
+                local unitInstance = unit.instances and unit.instances[instance]
+                local card, outcomes = self:draw(deckId)
+                draws[#draws + 1] = {
+                    unitId = unit.id,
+                    instance = instance,
+                    slot = unitInstance and unitInstance.slot or nil,
+                    deckId = deckId,
+                    deckType = deckType,
+                    card = card,
+                }
+                for _, outcome in ipairs(outcomes) do
+                    outcome.unitId = unit.id
+                    outcome.instance = instance
+                    outcome.slot = unitInstance and unitInstance.slot or nil
+                    results[#results + 1] = outcome
+                end
             end
         end
     end
